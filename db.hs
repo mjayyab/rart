@@ -14,6 +14,14 @@ createDBEntry :: DBColumn -> String -> DBEntry b
 createDBEntry ct@( DBColumn _ DBLitT ) val = DBEntry {dBColumn=ct, value=DBLit val}
 createDBEntry ct@( DBColumn _ DBIntT ) val = DBEntry {dBColumn=ct, value=DBInt ((read val)::Int)}
 
+instance Eq (DBVal a) where
+    (DBLit str1) == (DBLit str2) = str1 == str2
+    (DBInt int1) == (DBInt int2) = int1 == int2
+
+instance Ord (DBVal a) where
+    (DBLit str1) `compare` (DBLit str2) = str1 `compare` str2
+    (DBInt int1) `compare` (DBInt int2) = int1 `compare` int2
+
 instance Eq DBColumn where
     (DBColumn n1 _) == (DBColumn n2 _) = n1 == n2 
 
