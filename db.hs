@@ -51,3 +51,15 @@ project rel@( Relation hs ts ) projHeaders = Relation {headers = subsetHeaders h
     where subsetHeaders hs = Set.intersection projHeaders hs
           subsetTuples ts = Set.map (Set.filter (\entry -> Set.member (entryHeader entry) projHeaders)) ts
 
+data Operator = EQ' | GT' | LT' deriving(Show)
+
+evalOp :: Operator -> DBVal a -> DBVal a -> Bool
+evalOp (EQ') v1 v2 = v1 == v2
+evalOp (GT') v1 v2 = v1 > v2
+evalOp (LT') v1 v2 = v1 < v2
+
+data Predicate a = Predicate Operator DBColumn (DBVal a) deriving(Show)
+
+restrict :: Relation a -> Predicate a -> Relation a
+restrict rel@( Relation hs ts ) (Predicate op col val) = Relation{headers=hs, tuples=filteredTuples}
+    where filteredTuples = Set.filter (\t -> any (\e -> ((entryHeader e) == col) && (evalOp op (entryVal e) val)) (Set.toList t)) ts
