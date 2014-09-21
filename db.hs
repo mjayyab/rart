@@ -1,9 +1,10 @@
+
 import qualified Data.Set as Set
 
-data DBVal a = DBLit String 
-             | DBInt Int 
+data DBVal a = DBLit String
+             | DBInt Int
              deriving(Show)
-    
+
 data DBType = DBLitT | DBIntT deriving(Show)
 
 data DBColumn = DBColumn { name :: String, constructor :: DBType } deriving(Show)
@@ -23,10 +24,10 @@ instance Ord (DBVal a) where
     (DBInt int1) `compare` (DBInt int2) = int1 `compare` int2
 
 instance Eq DBColumn where
-    (DBColumn n1 _) == (DBColumn n2 _) = n1 == n2 
+    (DBColumn n1 _) == (DBColumn n2 _) = n1 == n2
 
 instance Ord DBColumn where
-    (DBColumn n1 _) `compare` (DBColumn n2 _) = n1 `compare` n2 
+    (DBColumn n1 _) `compare` (DBColumn n2 _) = n1 `compare` n2
 
 instance Eq (DBEntry a) where
     (DBEntry c1 v1) == (DBEntry c2 v2) = v1 == v2 
@@ -39,11 +40,11 @@ type DBTuple a = Set.Set (DBEntry a)
 
 data Relation a = Relation {headers :: DBHeaders, tuples :: Set.Set (DBTuple a)} deriving(Show)
 
-entryHeader :: DBEntry a -> DBColumn 
-entryHeader en@(DBEntry e_c _) = e_c  
+entryHeader :: DBEntry a -> DBColumn
+entryHeader en@(DBEntry e_c _) = e_c
 
-entryVal :: DBEntry a -> DBVal a 
-entryVal en@(DBEntry _ e_v) = e_v  
+entryVal :: DBEntry a -> DBVal a
+entryVal en@(DBEntry _ e_v) = e_v
 
 project :: Relation a -> DBHeaders -> Relation a
 project rel@( Relation hs ts ) projHeaders = Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
