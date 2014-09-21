@@ -30,10 +30,10 @@ instance Ord DBColumn where
     (DBColumn n1 _) `compare` (DBColumn n2 _) = n1 `compare` n2
 
 instance Eq (DBEntry a) where
-    (DBEntry c1 v1) == (DBEntry c2 v2) = v1 == v2 
+    (DBEntry c1 v1) == (DBEntry c2 v2) = c1 == c2 && v1 == v2
 
 instance Ord (DBEntry a) where
-    (DBEntry _ v1) `compare` (DBEntry _ v2) = v1 `compare` v2 
+    (DBEntry c1 v1) `compare` (DBEntry c2 v2) = if c1 == c2 then v1 `compare` v2 else c1 `compare` c2
 
 type DBHeaders = Set.Set DBColumn
 type DBTuple a = Set.Set (DBEntry a)
