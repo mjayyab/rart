@@ -14,8 +14,8 @@ let e33 = createDBEntry c3 "Jamal"
 
 let t2 = dbtupleFromSet $ Set.fromList [e11, e22, e33]
 
-let rel1 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=Set.fromList [t1,t2]}
-let rel2 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=Set.fromList [t1]}
+let rel1 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=relBodyFromSet (Set.fromList [t1,t2])}
+let rel2 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=relBodyFromSet (Set.fromList [t1])}
 
 let p1 = Predicate EQ' c1 (DBInt 1)
 let p1 = Predicate GT' c2 (DBInt 20)
@@ -33,4 +33,4 @@ let ebb = createDBEntry cb "4"
 
 let taa = dbtupleFromSet $ Set.fromList [eaa, ebb]
 
-let rela = Relation{headers=dbheadersfromSet (Set.fromList [ca, cb]), tuples=Set.fromList [ta,taa]}
+let rela = Relation{headers=dbheadersFromSet (Set.fromList [ca, cb]), tuples=relBodyFromSet (Set.fromList [ta,taa])}

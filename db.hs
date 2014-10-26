@@ -66,7 +66,17 @@ instance Show DBTuple where
 dbtupleFromSet :: Set.Set DBEntry -> DBTuple
 dbtupleFromSet = DBTuple 
 
-data Relation = Relation {headers :: DBHeaders, tuples :: Set.Set DBTuple}
+newtype RelationBody = RelationBody {
+    relBodyToSet :: Set.Set DBTuple
+}
+
+relBodyFromSet :: Set.Set DBTuple -> RelationBody
+relBodyFromSet = RelationBody
+
+instance Show RelationBody where
+    show relb = intercalate "\n" $ Set.toList $ Set.map show $ relBodyToSet relb
+
+data Relation = Relation {headers :: DBHeaders, tuples :: RelationBody}
 
 instance Show Relation where
     show rel@(Relation hs ts) = intercalate "\n" [show hs, show ts]
@@ -83,10 +93,11 @@ filterDbTuple f t = dbtupleFromSet $ Set.filter f (dbtupleToSet t)
 project :: Relation -> DBHeaders -> Relation
 project rel@( Relation hs ts ) projHeaders = Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
     where subsetHeaders hs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hs)
-          subsetTuples ts = Set.map (filterDbTuple 
+          subsetTuples ts = relBodyFromSet $ 
+                            Set.map (filterDbTuple 
                                         (\entry -> Set.member (entryHeader entry) (toSet projHeaders))
                                     ) 
-                                    ts
+                                    (relBodyToSet ts)
 
 data Operator = EQ' | GT' | LT' deriving(Show)
 
@@ -99,16 +110,16 @@ data Predicate = Predicate Operator DBColumn DBVal deriving(Show)
 
 restrict :: Relation -> Predicate -> Relation
 restrict rel@( Relation hs ts ) (Predicate op col val) = Relation{headers=hs, tuples=filteredTuples}
-    where filteredTuples = Set.filter (\t -> any (\e -> ((entryHeader e) == col) && (evalOp op (entryVal e) val)) (Set.toList $ dbtupleToSet t)) ts
+    where filteredTuples = relBodyFromSet $ Set.filter (\t -> any (\e -> ((entryHeader e) == col) && (evalOp op (entryVal e) val)) (Set.toList $ dbtupleToSet t)) (relBodyToSet ts)
 
 product :: Relation -> Relation -> Either String Relation
 product rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
     if Set.null $ Set.intersection (toSet hs1) (toSet hs2)
         then Right Relation{headers= dbheadersFromSet $ Set.union (toSet hs1) (toSet hs2), tuples=cartesianProd ts1 ts2}
         else Left "Cannot perform product because of shared headers"
-    where cartesianProd ts1 ts2 = Set.fromList [ dbtupleFromSet (Set.union (dbtupleToSet i) (dbtupleToSet j)) | i <- xs, j <- ys]
-          xs = Set.toList ts1
-          ys = Set.toList ts2
+    where cartesianProd ts1 ts2 = relBodyFromSet $ Set.fromList [ dbtupleFromSet (Set.union (dbtupleToSet i) (dbtupleToSet j)) | i <- xs, j <- ys]
+          xs = Set.toList $ relBodyToSet ts1
+          ys = Set.toList $ relBodyToSet ts2
 
 union :: Relation -> Relation -> Relation
 union rel1 rel2 = undefined
