@@ -1,15 +1,26 @@
 
 import qualified Data.Set as Set
+import Text.Printf (printf)
+import Data.List (intercalate)
 
 data DBVal = DBLit String
            | DBInt Int
-             deriving(Show)
+
+instance Show DBVal where
+    show (DBLit s) = s
+    show (DBInt i) = show i
 
 data DBType = DBLitT | DBIntT deriving(Show)
 
-data DBColumn = DBColumn { name :: String, constructor :: DBType } deriving(Show)
+data DBColumn = DBColumn { name :: String, constructor :: DBType }
 
-data DBEntry = DBEntry { dBColumn :: DBColumn, value :: DBVal } deriving(Show)
+instance Show DBColumn where
+    show col@(DBColumn n c) = printf "%s(%s)" (show c) n
+
+data DBEntry = DBEntry { dBColumn :: DBColumn, value :: DBVal }
+
+instance Show DBEntry where
+    show dbent@( DBEntry col@(DBColumn colname colcon) val) = printf "%s(%s)" colname (show val)
 
 createDBEntry :: DBColumn -> String -> DBEntry
 createDBEntry ct@( DBColumn _ DBLitT ) val = DBEntry {dBColumn=ct, value=DBLit val}
@@ -35,10 +46,30 @@ instance Eq DBEntry where
 instance Ord DBEntry where
     (DBEntry c1 v1) `compare` (DBEntry c2 v2) = if c1 == c2 then v1 `compare` v2 else c1 `compare` c2
 
-type DBHeaders = Set.Set DBColumn
-type DBTuple = Set.Set DBEntry
+newtype DBHeaders = DBHeaders {
+    toSet :: Set.Set DBColumn
+}
 
-data Relation = Relation {headers :: DBHeaders, tuples :: Set.Set DBTuple} deriving(Show)
+dbheadersFromSet :: Set.Set DBColumn -> DBHeaders
+dbheadersFromSet = DBHeaders
+
+instance Show DBHeaders where
+    show hs = intercalate "|" $ Set.toList $ Set.map show $ toSet hs
+
+newtype DBTuple = DBTuple {
+    dbtupleToSet :: Set.Set DBEntry
+} deriving(Eq, Ord)
+
+instance Show DBTuple where
+    show tp = intercalate "|" $ Set.toList $ Set.map show $ dbtupleToSet tp
+
+dbtupleFromSet :: Set.Set DBEntry -> DBTuple
+dbtupleFromSet = DBTuple 
+
+data Relation = Relation {headers :: DBHeaders, tuples :: Set.Set DBTuple}
+
+instance Show Relation where
+    show rel@(Relation hs ts) = intercalate "\n" [show hs, show ts]
 
 entryHeader :: DBEntry -> DBColumn
 entryHeader en@(DBEntry e_c _) = e_c
@@ -46,10 +77,16 @@ entryHeader en@(DBEntry e_c _) = e_c
 entryVal :: DBEntry -> DBVal
 entryVal en@(DBEntry _ e_v) = e_v
 
+filterDbTuple :: (DBEntry -> Bool) -> DBTuple -> DBTuple
+filterDbTuple f t = dbtupleFromSet $ Set.filter f (dbtupleToSet t)
+
 project :: Relation -> DBHeaders -> Relation
 project rel@( Relation hs ts ) projHeaders = Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
-    where subsetHeaders hs = Set.intersection projHeaders hs
-          subsetTuples ts = Set.map (Set.filter (\entry -> Set.member (entryHeader entry) projHeaders)) ts
+    where subsetHeaders hs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hs)
+          subsetTuples ts = Set.map (filterDbTuple 
+                                        (\entry -> Set.member (entryHeader entry) (toSet projHeaders))
+                                    ) 
+                                    ts
 
 data Operator = EQ' | GT' | LT' deriving(Show)
 
@@ -62,4 +99,22 @@ data Predicate = Predicate Operator DBColumn DBVal deriving(Show)
 
 restrict :: Relation -> Predicate -> Relation
 restrict rel@( Relation hs ts ) (Predicate op col val) = Relation{headers=hs, tuples=filteredTuples}
-    where filteredTuples = Set.filter (\t -> any (\e -> ((entryHeader e) == col) && (evalOp op (entryVal e) val)) (Set.toList t)) ts
+    where filteredTuples = Set.filter (\t -> any (\e -> ((entryHeader e) == col) && (evalOp op (entryVal e) val)) (Set.toList $ dbtupleToSet t)) ts
+
+product :: Relation -> Relation -> Either String Relation
+product rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
+    if Set.null $ Set.intersection (toSet hs1) (toSet hs2)
+        then Right Relation{headers= dbheadersFromSet $ Set.union (toSet hs1) (toSet hs2), tuples=cartesianProd ts1 ts2}
+        else Left "Cannot perform product because of shared headers"
+    where cartesianProd ts1 ts2 = Set.fromList [ dbtupleFromSet (Set.union (dbtupleToSet i) (dbtupleToSet j)) | i <- xs, j <- ys]
+          xs = Set.toList ts1
+          ys = Set.toList ts2
+
+union :: Relation -> Relation -> Relation
+union rel1 rel2 = undefined
+
+intersection :: Relation -> Relation -> Relation
+intersection rel1 rel2 = undefined
+
+difference :: Relation -> Relation -> Relation
+difference rel1 rel2 = undefined
