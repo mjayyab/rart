@@ -18,7 +18,7 @@ let rel1 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=r
 let rel2 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=relBodyFromSet (Set.fromList [t1])}
 
 let p1 = Predicate EQ' c1 (DBInt 1)
-let p1 = Predicate GT' c2 (DBInt 20)
+let p2 = Predicate GT' c2 (DBInt 20)
 
 let ca = DBColumn{name="Subject", constructor=DBLitT}
 let cb = DBColumn{name="Hours", constructor=DBIntT}
