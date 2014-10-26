@@ -90,8 +90,8 @@ entryVal en@(DBEntry _ e_v) = e_v
 filterDbTuple :: (DBEntry -> Bool) -> DBTuple -> DBTuple
 filterDbTuple f t = dbtupleFromSet $ Set.filter f (dbtupleToSet t)
 
-project :: Relation -> DBHeaders -> Either String Relation
-project rel@( Relation hs ts ) projHeaders = Right Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
+project :: DBHeaders -> Relation -> Either String Relation
+project projHeaders rel@( Relation hs ts ) = Right Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
     where subsetHeaders hs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hs)
           subsetTuples ts = relBodyFromSet $ 
                             Set.map (filterDbTuple 
@@ -108,8 +108,8 @@ evalOp (LT') v1 v2 = v1 < v2
 
 data Predicate = Predicate Operator DBColumn DBVal deriving(Show)
 
-restrict :: Relation -> Predicate -> Either String Relation
-restrict rel@( Relation hs ts ) (Predicate op col val) = Right Relation{headers=hs, tuples=filteredTuples}
+restrict :: Predicate -> Relation -> Either String Relation
+restrict (Predicate op col val) rel@( Relation hs ts ) = Right Relation{headers=hs, tuples=filteredTuples}
     where filteredTuples = relBodyFromSet $ Set.filter (\t -> any (\e -> ((entryHeader e) == col) && (evalOp op (entryVal e) val)) (Set.toList $ dbtupleToSet t)) (relBodyToSet ts)
 
 product :: Relation -> Relation -> Either String Relation
