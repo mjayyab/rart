@@ -90,8 +90,8 @@ entryVal en@(DBEntry _ e_v) = e_v
 filterDbTuple :: (DBEntry -> Bool) -> DBTuple -> DBTuple
 filterDbTuple f t = dbtupleFromSet $ Set.filter f (dbtupleToSet t)
 
-project :: DBHeaders -> Relation -> Either String Relation
-project projHeaders rel@( Relation hs ts ) = Right Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
+project :: DBHeaders -> Relation -> Evaluator Relation
+project projHeaders rel@( Relation hs ts ) = return $ Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
     where subsetHeaders hs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hs)
           subsetTuples ts = relBodyFromSet $ 
                             Set.map (filterDbTuple 
@@ -108,15 +108,24 @@ evalOp (LT') v1 v2 = v1 < v2
 
 data Predicate = Predicate Operator DBColumn DBVal deriving(Show)
 
-restrict :: Predicate -> Relation -> Either String Relation
-restrict (Predicate op col val) rel@( Relation hs ts ) = Right Relation{headers=hs, tuples=filteredTuples}
+newtype Evaluator a = Ev (Either String a) deriving (Show)
+instance Monad Evaluator where
+    (Ev ev) >>= k =
+        case ev of
+          Left msg -> Ev (Left msg)
+          Right v -> k v
+    return v = Ev (Right v)
+    fail msg = Ev (Left msg)    
+
+restrict :: Predicate -> Relation -> Evaluator Relation
+restrict (Predicate op col val) rel@( Relation hs ts ) = return Relation{headers=hs, tuples=filteredTuples}
     where filteredTuples = relBodyFromSet $ Set.filter (\t -> any (\e -> ((entryHeader e) == col) && (evalOp op (entryVal e) val)) (Set.toList $ dbtupleToSet t)) (relBodyToSet ts)
 
-product :: Relation -> Relation -> Either String Relation
+product :: Relation -> Relation -> Evaluator Relation
 product rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
     if Set.null $ Set.intersection (toSet hs1) (toSet hs2)
-        then Right Relation{headers= dbheadersFromSet $ Set.union (toSet hs1) (toSet hs2), tuples=cartesianProd ts1 ts2}
-        else Left "Cannot perform product because of shared headers"
+        then return Relation{headers= dbheadersFromSet $ Set.union (toSet hs1) (toSet hs2), tuples=cartesianProd ts1 ts2}
+        else fail "Cannot perform product because of shared headers"
     where cartesianProd ts1 ts2 = relBodyFromSet $ Set.fromList [ dbtupleFromSet (Set.union (dbtupleToSet i) (dbtupleToSet j)) | i <- xs, j <- ys]
           xs = Set.toList $ relBodyToSet ts1
           ys = Set.toList $ relBodyToSet ts2
