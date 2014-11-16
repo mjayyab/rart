@@ -56,6 +56,9 @@ dbheadersFromSet = DBHeaders
 instance Show DBHeaders where
     show hs = intercalate "|" $ Set.toList $ Set.map show $ toSet hs
 
+instance Eq DBHeaders where
+    hs1 == hs2 = (toSet hs1) == (toSet hs2)
+
 newtype DBTuple = DBTuple {
     dbtupleToSet :: Set.Set DBEntry
 } deriving(Eq, Ord)
@@ -131,10 +134,20 @@ product rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) =
           ys = Set.toList $ relBodyToSet ts2
 
 union :: Relation -> Relation -> Either String Relation
-union rel1 rel2 = undefined
+union rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
+    if hs1 == hs2
+        then return Relation{headers=hs1, tuples= relBodyFromSet (Set.union (relBodyToSet ts1) (relBodyToSet ts2))}
+        else fail "Cannot perfrom union on relations with mismatching headers"
 
 intersection :: Relation -> Relation -> Either String Relation
-intersection rel1 rel2 = undefined
+intersection rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
+    if hs1 == hs2
+        then return Relation{headers=hs1, tuples= relBodyFromSet (Set.intersection (relBodyToSet ts1) (relBodyToSet ts2))}
+        else fail "Cannot perfrom intersection on relations with mismatching headers"
 
 difference :: Relation -> Relation -> Either String Relation
-difference rel1 rel2 = undefined
+difference rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
+    if hs1 == hs2
+        then return Relation{headers=hs1, tuples= relBodyFromSet (Set.difference (relBodyToSet ts1) (relBodyToSet ts2))}
+        else fail "Cannot perfrom difference on relations with mismatching headers"
+
