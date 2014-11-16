@@ -133,19 +133,19 @@ product rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) =
           xs = Set.toList $ relBodyToSet ts1
           ys = Set.toList $ relBodyToSet ts2
 
-union :: Relation -> Relation -> Either String Relation
+union :: Relation -> Relation -> Evaluator Relation
 union rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
     if hs1 == hs2
         then return Relation{headers=hs1, tuples= relBodyFromSet (Set.union (relBodyToSet ts1) (relBodyToSet ts2))}
         else fail "Cannot perfrom union on relations with mismatching headers"
 
-intersection :: Relation -> Relation -> Either String Relation
+intersection :: Relation -> Relation -> Evaluator Relation
 intersection rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
     if hs1 == hs2
         then return Relation{headers=hs1, tuples= relBodyFromSet (Set.intersection (relBodyToSet ts1) (relBodyToSet ts2))}
         else fail "Cannot perfrom intersection on relations with mismatching headers"
 
-difference :: Relation -> Relation -> Either String Relation
+difference :: Relation -> Relation -> Evaluator Relation
 difference rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
     if hs1 == hs2
         then return Relation{headers=hs1, tuples= relBodyFromSet (Set.difference (relBodyToSet ts1) (relBodyToSet ts2))}
