@@ -1,3 +1,4 @@
+module Relational where
 
 import qualified Data.Set as Set
 import Text.Printf (printf)
@@ -15,16 +16,16 @@ data DBType = DBLitT | DBIntT deriving(Show)
 data DBColumn = DBColumn { name :: String, constructor :: DBType }
 
 instance Show DBColumn where
-    show col@(DBColumn n c) = printf "%s(%s)" (show c) n
+    show (DBColumn n c) = printf "%s(%s)" (show c) n
 
 data DBEntry = DBEntry { dBColumn :: DBColumn, value :: DBVal }
 
 instance Show DBEntry where
-    show dbent@( DBEntry col@(DBColumn colname colcon) val) = printf "%s(%s)" colname (show val)
+    show (DBEntry (DBColumn colname _) val) = printf "%s(%s)" colname (show val)
 
 createDBEntry :: DBColumn -> String -> DBEntry
 createDBEntry ct@( DBColumn _ DBLitT ) val = DBEntry {dBColumn=ct, value=DBLit val}
-createDBEntry ct@( DBColumn _ DBIntT ) val = DBEntry {dBColumn=ct, value=DBInt ((read val)::Int)}
+createDBEntry ct@( DBColumn _ DBIntT ) val = DBEntry {dBColumn=ct, value=DBInt (read val :: Int)}
 
 instance Eq DBVal where
     (DBLit str1) == (DBLit str2) = str1 == str2
@@ -57,7 +58,7 @@ instance Show DBHeaders where
     show hs = intercalate "|" $ Set.toList $ Set.map show $ toSet hs
 
 instance Eq DBHeaders where
-    hs1 == hs2 = (toSet hs1) == (toSet hs2)
+    hs1 == hs2 = toSet hs1 == toSet hs2
 
 newtype DBTuple = DBTuple {
     dbtupleToSet :: Set.Set DBEntry
@@ -67,7 +68,7 @@ instance Show DBTuple where
     show tp = intercalate "|" $ Set.toList $ Set.map show $ dbtupleToSet tp
 
 dbtupleFromSet :: Set.Set DBEntry -> DBTuple
-dbtupleFromSet = DBTuple 
+dbtupleFromSet = DBTuple
 
 newtype RelationBody = RelationBody {
     relBodyToSet :: Set.Set DBTuple
@@ -82,25 +83,25 @@ instance Show RelationBody where
 data Relation = Relation {headers :: DBHeaders, tuples :: RelationBody}
 
 instance Show Relation where
-    show rel@(Relation hs ts) = intercalate "\n" [show hs, show ts]
+    show (Relation hs ts) = intercalate "\n" [show hs, show ts]
 
 entryHeader :: DBEntry -> DBColumn
-entryHeader en@(DBEntry e_c _) = e_c
+entryHeader (DBEntry e_c _) = e_c
 
 entryVal :: DBEntry -> DBVal
-entryVal en@(DBEntry _ e_v) = e_v
+entryVal (DBEntry _ e_v) = e_v
 
 filterDbTuple :: (DBEntry -> Bool) -> DBTuple -> DBTuple
 filterDbTuple f t = dbtupleFromSet $ Set.filter f (dbtupleToSet t)
 
 project :: DBHeaders -> Relation -> Evaluator Relation
-project projHeaders rel@( Relation hs ts ) = return $ Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
-    where subsetHeaders hs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hs)
-          subsetTuples ts = relBodyFromSet $ 
-                            Set.map (filterDbTuple 
+project projHeaders ( Relation hs ts ) = return Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
+    where subsetHeaders hrs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hrs)
+          subsetTuples tls = relBodyFromSet $
+                            Set.map (filterDbTuple
                                         (\entry -> Set.member (entryHeader entry) (toSet projHeaders))
-                                    ) 
-                                    (relBodyToSet ts)
+                                    )
+                                    (relBodyToSet tls)
 
 data Operator = EQ' | GT' | LT' deriving(Show)
 
@@ -118,35 +119,33 @@ instance Monad Evaluator where
           Left msg -> Ev (Left msg)
           Right v -> k v
     return v = Ev (Right v)
-    fail msg = Ev (Left msg)    
+    fail msg = Ev (Left msg)
 
 restrict :: Predicate -> Relation -> Evaluator Relation
-restrict (Predicate op col val) rel@( Relation hs ts ) = return Relation{headers=hs, tuples=filteredTuples}
-    where filteredTuples = relBodyFromSet $ Set.filter (\t -> any (\e -> ((entryHeader e) == col) && (evalOp op (entryVal e) val)) (Set.toList $ dbtupleToSet t)) (relBodyToSet ts)
+restrict (Predicate op col val) (Relation hs ts) = return Relation{headers=hs, tuples=filteredTuples}
+    where filteredTuples = relBodyFromSet $ Set.filter (\t -> any (\e -> (entryHeader e == col) && evalOp op (entryVal e) val) (Set.toList $ dbtupleToSet t)) (relBodyToSet ts)
 
 product :: Relation -> Relation -> Evaluator Relation
-product rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
+product (Relation hs1 ts1) (Relation hs2 ts2) =
     if Set.null $ Set.intersection (toSet hs1) (toSet hs2)
         then return Relation{headers= dbheadersFromSet $ Set.union (toSet hs1) (toSet hs2), tuples=cartesianProd ts1 ts2}
         else fail "Cannot perform product because of shared headers"
-    where cartesianProd ts1 ts2 = relBodyFromSet $ Set.fromList [ dbtupleFromSet (Set.union (dbtupleToSet i) (dbtupleToSet j)) | i <- xs, j <- ys]
-          xs = Set.toList $ relBodyToSet ts1
-          ys = Set.toList $ relBodyToSet ts2
+    where cartesianProd tls1 tls2 = relBodyFromSet $ Set.fromList [dbtupleFromSet (dbtupleToSet i `Set.union` dbtupleToSet j) | i <- Set.toList $ relBodyToSet tls1, j <- Set.toList $ relBodyToSet tls2]
 
 union :: Relation -> Relation -> Evaluator Relation
-union rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
+union (Relation hs1 ts1) (Relation hs2 ts2) =
     if hs1 == hs2
-        then return Relation{headers=hs1, tuples= relBodyFromSet (Set.union (relBodyToSet ts1) (relBodyToSet ts2))}
+        then return Relation{headers=hs1, tuples= relBodyFromSet (relBodyToSet ts1 `Set.union` relBodyToSet ts2)}
         else fail "Cannot perfrom union on relations with mismatching headers"
 
 intersection :: Relation -> Relation -> Evaluator Relation
-intersection rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
+intersection (Relation hs1 ts1) (Relation hs2 ts2) =
     if hs1 == hs2
         then return Relation{headers=hs1, tuples= relBodyFromSet (Set.intersection (relBodyToSet ts1) (relBodyToSet ts2))}
         else fail "Cannot perfrom intersection on relations with mismatching headers"
 
 difference :: Relation -> Relation -> Evaluator Relation
-difference rel1@(Relation hs1 ts1) rel2@(Relation hs2 ts2) = 
+difference (Relation hs1 ts1) (Relation hs2 ts2) =
     if hs1 == hs2
         then return Relation{headers=hs1, tuples= relBodyFromSet (Set.difference (relBodyToSet ts1) (relBodyToSet ts2))}
         else fail "Cannot perfrom difference on relations with mismatching headers"
