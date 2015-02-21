@@ -94,15 +94,6 @@ entryVal (DBEntry _ e_v) = e_v
 filterDbTuple :: (DBEntry -> Bool) -> DBTuple -> DBTuple
 filterDbTuple f t = dbtupleFromSet $ Set.filter f (dbtupleToSet t)
 
-project :: DBHeaders -> Relation -> Evaluator Relation
-project projHeaders ( Relation hs ts ) = return Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
-    where subsetHeaders hrs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hrs)
-          subsetTuples tls = relBodyFromSet $
-                            Set.map (filterDbTuple
-                                        (\entry -> Set.member (entryHeader entry) (toSet projHeaders))
-                                    )
-                                    (relBodyToSet tls)
-
 data Operator = EQ' | GT' | LT' deriving(Show)
 
 evalOp :: Operator -> DBVal -> DBVal -> Bool
@@ -120,6 +111,15 @@ instance Monad Evaluator where
           Right v -> k v
     return v = Ev (Right v)
     fail msg = Ev (Left msg)
+
+project :: DBHeaders -> Relation -> Evaluator Relation
+project projHeaders ( Relation hs ts ) = return Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
+    where subsetHeaders hrs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hrs)
+          subsetTuples tls = relBodyFromSet $
+                            Set.map (filterDbTuple
+                                        (\entry -> Set.member (entryHeader entry) (toSet projHeaders))
+                                    )
+                                    (relBodyToSet tls)
 
 restrict :: Predicate -> Relation -> Evaluator Relation
 restrict (Predicate op col val) (Relation hs ts) = return Relation{headers=hs, tuples=filteredTuples}
