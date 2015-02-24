@@ -1,36 +1,42 @@
-let c1 = DBColumn{name="ID", constructor=DBIntT}
-let c2 = DBColumn{name="Age", constructor=DBIntT}
-let c3 = DBColumn{name="Name", constructor=DBLitT}
+import Relational
+import qualified Data.Set as Set
 
-let e1 = createDBEntry c1 "0"
-let e2 = createDBEntry c2 "10"
-let e3 = createDBEntry c3 "Moh"
+c1 = DBColumn{name="ID", constructor=DBIntT}
+c2 = DBColumn{name="Age", constructor=DBIntT}
+c3 = DBColumn{name="Name", constructor=DBLitT}
 
-let t1 = dbtupleFromSet $ Set.fromList [e1, e2, e3]
+e1 = createDBEntry c1 "0"
+e2 = createDBEntry c2 "10"
+e3 = createDBEntry c3 "Moh"
 
-let e11 = createDBEntry c1 "1"
-let e22 = createDBEntry c2 "30"
-let e33 = createDBEntry c3 "Jamal"
+t1 = dbtupleFromSet $ Set.fromList [e1, e2, e3]
 
-let t2 = dbtupleFromSet $ Set.fromList [e11, e22, e33]
+e11 = createDBEntry c1 "1"
+e22 = createDBEntry c2 "30"
+e33 = createDBEntry c3 "Jamal"
 
-let rel1 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=relBodyFromSet (Set.fromList [t1,t2])}
-let rel2 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=relBodyFromSet (Set.fromList [t1])}
+t2 = dbtupleFromSet $ Set.fromList [e11, e22, e33]
 
-let p1 = Predicate EQ' c1 (DBInt 1)
-let p2 = Predicate GT' c2 (DBInt 20)
+rel1 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=relBodyFromSet (Set.fromList [t1,t2])}
+rel2 = Relation{headers=dbheadersFromSet (Set.fromList [c1,c2,c3]), tuples=relBodyFromSet (Set.fromList [t1])}
 
-let ca = DBColumn{name="Subject", constructor=DBLitT}
-let cb = DBColumn{name="Hours", constructor=DBIntT}
+p1 = Predicate EQ' c1 (DBInt 1)
+p2 = Predicate GT' c2 (DBInt 20)
 
-let ea = createDBEntry ca "Math"
-let eb = createDBEntry cb "3"
+ca = DBColumn{name="Subject", constructor=DBLitT}
+cb = DBColumn{name="Hours", constructor=DBIntT}
 
-let ta = dbtupleFromSet $ Set.fromList [ea, eb]
+ea = createDBEntry ca "Math"
+eb = createDBEntry cb "3"
 
-let eaa = createDBEntry ca "Science"
-let ebb = createDBEntry cb "4"
+ta = dbtupleFromSet $ Set.fromList [ea, eb]
 
-let taa = dbtupleFromSet $ Set.fromList [eaa, ebb]
+eaa = createDBEntry ca "Science"
+ebb = createDBEntry cb "4"
 
-let rela = Relation{headers=dbheadersFromSet (Set.fromList [ca, cb]), tuples=relBodyFromSet (Set.fromList [ta,taa])}
+taa = dbtupleFromSet $ Set.fromList [eaa, ebb]
+
+rela = Relation{headers=dbheadersFromSet (Set.fromList [ca, cb]), tuples=relBodyFromSet (Set.fromList [ta,taa])}
+
+main = do
+  return ()
