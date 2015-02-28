@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
+
 import Relational
 import qualified Data.Set as Set
 
@@ -38,5 +41,4 @@ taa = dbtupleFromSet $ Set.fromList [eaa, ebb]
 
 rela = Relation{headers=dbheadersFromSet (Set.fromList [ca, cb]), tuples=relBodyFromSet (Set.fromList [ta,taa])}
 
-main = do
-  return ()
+main = return ()
