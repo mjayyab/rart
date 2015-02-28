@@ -1,0 +1,12 @@
+Name: rart
+Version: 0.1
+License: BSD3
+Build-Type: Simple
+Homepage: https://github.com/mjayyab/rart.git
+Category: Relational Algebra
+Cabal-Version: >= 1.2
+
+Executable tutd
+    Build-Depends: base, containers
+    main-is: example.hs
+    GHC-Options: -fwarn-unused-imports -fwarn-unused-binds	
