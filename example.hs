@@ -41,4 +41,7 @@ taa = dbtupleFromSet $ Set.fromList [eaa, ebb]
 
 rela = Relation{headers=dbheadersFromSet (Set.fromList [ca, cb]), tuples=relBodyFromSet (Set.fromList [ta,taa])}
 
+-- PHOAS
+exp1 = Expr $ Projection (dbheadersFromSet (Set.fromList [c1])) (Union (RelationDecl rel1) (RelationDecl rel2))
+
 main = return ()

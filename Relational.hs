@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Relational where
 
 import qualified Data.Set as Set
@@ -150,3 +152,37 @@ difference (Relation hs1 ts1) (Relation hs2 ts2) =
         then return Relation{headers=hs1, tuples= relBodyFromSet (Set.difference (relBodyToSet ts1) (relBodyToSet ts2))}
         else fail "Cannot perfrom difference on relations with mismatching headers"
 
+
+
+data RelationalExp
+  = RelationDecl Relation
+  | Projection DBHeaders RelationalExp
+  | Restriction Predicate RelationalExp
+  | Union RelationalExp RelationalExp
+  | Intersection RelationalExp RelationalExp
+  | Difference RelationalExp RelationalExp
+  | Join RelationalExp RelationalExp
+
+
+type RelValue = Evaluator Relation
+
+eval :: Expr -> RelValue
+eval e = ev (unExpr e) where
+  ev (RelationDecl rel)           = return rel
+  ev (Projection hs rel_e)        = project hs =<< ev rel_e
+  ev (Restriction p rel_e)        = restrict p =<< ev rel_e
+  ev (Union rel_e1 rel_e2)        = do
+                                    first  <- ev rel_e1
+                                    second <- ev rel_e2
+                                    union first second
+  ev (Intersection rel_e1 rel_e2) = do
+                                    first  <- ev rel_e1
+                                    second <- ev rel_e2
+                                    union first second
+  ev (Difference rel_e1 rel_e2)   = do
+                                    first  <- ev rel_e1
+                                    second <- ev rel_e2
+                                    union first second
+  -- ev (Join rel_e1 rel_e2)      = join (ev rel_e1) (ev rel_e2)
+
+newtype Expr = Expr { unExpr :: forall a . RelationalExp }
