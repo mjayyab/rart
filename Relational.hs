@@ -1,188 +1,94 @@
 {-# LANGUAGE RankNTypes #-}
 
-module Relational where
+module Relational(RelValue, Expr, eval) where
 
-import qualified Data.Set as Set
-import Text.Printf (printf)
-import Data.List (intercalate)
+import Data.Set as Set
 
-data DBVal = DBLit String
-           | DBInt Int
+import DBRelation as DBR (DBRelation(..), DBEvaluator)
+import DBHeaders as DBH (DBHeaders, toSet, fromSet)
+import DBRelBody as DBB (DBRelBody, toSet, fromSet)
+import DBPredicate as DBP (DBPredicate(DBPredicate), evalOp)
+import DBTuple as DBT (toSet, fromSet, filter)
+import DBEntry as DBE (getHeader, getValue)
 
-instance Show DBVal where
-    show (DBLit s) = s
-    show (DBInt i) = show i
-
-data DBType = DBLitT | DBIntT deriving(Show)
-
-data DBColumn = DBColumn { name :: String, constructor :: DBType }
-
-instance Show DBColumn where
-    show (DBColumn n c) = printf "%s(%s)" (show c) n
-
-data DBEntry = DBEntry { dBColumn :: DBColumn, value :: DBVal }
-
-instance Show DBEntry where
-    show (DBEntry (DBColumn colname _) val) = printf "%s(%s)" colname (show val)
-
-createDBEntry :: DBColumn -> String -> DBEntry
-createDBEntry ct@( DBColumn _ DBLitT ) val = DBEntry {dBColumn=ct, value=DBLit val}
-createDBEntry ct@( DBColumn _ DBIntT ) val = DBEntry {dBColumn=ct, value=DBInt (read val :: Int)}
-
-instance Eq DBVal where
-    (DBLit str1) == (DBLit str2) = str1 == str2
-    (DBInt int1) == (DBInt int2) = int1 == int2
-
-instance Ord DBVal where
-    (DBLit str1) `compare` (DBLit str2) = str1 `compare` str2
-    (DBInt int1) `compare` (DBInt int2) = int1 `compare` int2
-
-instance Eq DBColumn where
-    (DBColumn n1 _) == (DBColumn n2 _) = n1 == n2
-
-instance Ord DBColumn where
-    (DBColumn n1 _) `compare` (DBColumn n2 _) = n1 `compare` n2
-
-instance Eq DBEntry where
-    (DBEntry c1 v1) == (DBEntry c2 v2) = c1 == c2 && v1 == v2
-
-instance Ord DBEntry where
-    (DBEntry c1 v1) `compare` (DBEntry c2 v2) = if c1 == c2 then v1 `compare` v2 else c1 `compare` c2
-
-newtype DBHeaders = DBHeaders {
-    toSet :: Set.Set DBColumn
-}
-
-dbheadersFromSet :: Set.Set DBColumn -> DBHeaders
-dbheadersFromSet = DBHeaders
-
-instance Show DBHeaders where
-    show hs = intercalate "|" $ Set.toList $ Set.map show $ toSet hs
-
-instance Eq DBHeaders where
-    hs1 == hs2 = toSet hs1 == toSet hs2
-
-newtype DBTuple = DBTuple {
-    dbtupleToSet :: Set.Set DBEntry
-} deriving(Eq, Ord)
-
-instance Show DBTuple where
-    show tp = intercalate "|" $ Set.toList $ Set.map show $ dbtupleToSet tp
-
-dbtupleFromSet :: Set.Set DBEntry -> DBTuple
-dbtupleFromSet = DBTuple
-
-newtype RelationBody = RelationBody {
-    relBodyToSet :: Set.Set DBTuple
-}
-
-relBodyFromSet :: Set.Set DBTuple -> RelationBody
-relBodyFromSet = RelationBody
-
-instance Show RelationBody where
-    show relb = intercalate "\n" $ Set.toList $ Set.map show $ relBodyToSet relb
-
-data Relation = Relation {headers :: DBHeaders, tuples :: RelationBody}
-
-instance Show Relation where
-    show (Relation hs ts) = intercalate "\n" [show hs, show ts]
-
-entryHeader :: DBEntry -> DBColumn
-entryHeader (DBEntry e_c _) = e_c
-
-entryVal :: DBEntry -> DBVal
-entryVal (DBEntry _ e_v) = e_v
-
-filterDbTuple :: (DBEntry -> Bool) -> DBTuple -> DBTuple
-filterDbTuple f t = dbtupleFromSet $ Set.filter f (dbtupleToSet t)
-
-data Operator = EQ' | GT' | LT' deriving(Show)
-
-evalOp :: Operator -> DBVal -> DBVal -> Bool
-evalOp (EQ') v1 v2 = v1 == v2
-evalOp (GT') v1 v2 = v1 > v2
-evalOp (LT') v1 v2 = v1 < v2
-
-data Predicate = Predicate Operator DBColumn DBVal deriving(Show)
-
-newtype Evaluator a = Ev (Either String a) deriving (Show)
-instance Monad Evaluator where
-    (Ev ev) >>= k =
-        case ev of
-          Left msg -> Ev (Left msg)
-          Right v -> k v
-    return v = Ev (Right v)
-    fail msg = Ev (Left msg)
-
-project :: DBHeaders -> Relation -> Evaluator Relation
-project projHeaders ( Relation hs ts ) = return Relation {headers = subsetHeaders hs, tuples = subsetTuples ts}
-    where subsetHeaders hrs = dbheadersFromSet $ Set.intersection (toSet projHeaders) (toSet hrs)
-          subsetTuples tls = relBodyFromSet $
-                            Set.map (filterDbTuple
-                                        (\entry -> Set.member (entryHeader entry) (toSet projHeaders))
+project :: DBHeaders -> DBR.DBRelation -> DBR.DBEvaluator DBR.DBRelation
+project projHeaders ( DBR.DBRelation hs ts ) = return DBR.DBRelation {DBR.headers = subsetHeaders hs, DBR.tuples = subsetTuples ts}
+    where subsetHeaders hrs = DBH.fromSet $ Set.intersection (DBH.toSet projHeaders) (DBH.toSet hrs)
+          subsetTuples tls = DBB.fromSet $
+                            Set.map (DBT.filter
+                                        (\entry -> Set.member (DBE.getHeader entry) (DBH.toSet projHeaders))
                                     )
-                                    (relBodyToSet tls)
+                                    (DBB.toSet tls)
 
-restrict :: Predicate -> Relation -> Evaluator Relation
-restrict (Predicate op col val) (Relation hs ts) = return Relation{headers=hs, tuples=filteredTuples}
-    where filteredTuples = relBodyFromSet $ Set.filter (\t -> any (\e -> (entryHeader e == col) && evalOp op (entryVal e) val) (Set.toList $ dbtupleToSet t)) (relBodyToSet ts)
+restrict :: DBPredicate -> DBR.DBRelation -> DBR.DBEvaluator DBR.DBRelation
+restrict (DBPredicate op col val) (DBR.DBRelation hs ts) = return DBR.DBRelation{DBR.headers=hs, DBR.tuples=filteredTuples}
+    where filteredTuples = DBB.fromSet $ Set.filter (\t -> any (\e -> (DBE.getHeader e == col) && evalOp op (DBE.getValue e) val) (Set.toList $ DBT.toSet t)) (DBB.toSet ts)
 
-product :: Relation -> Relation -> Evaluator Relation
-product (Relation hs1 ts1) (Relation hs2 ts2) =
-    if Set.null $ Set.intersection (toSet hs1) (toSet hs2)
-        then return Relation{headers= dbheadersFromSet $ Set.union (toSet hs1) (toSet hs2), tuples=cartesianProd ts1 ts2}
+product :: DBR.DBRelation -> DBR.DBRelation -> DBR.DBEvaluator DBR.DBRelation
+product (DBR.DBRelation hs1 ts1) (DBR.DBRelation hs2 ts2) =
+    if Set.null $ Set.intersection (DBH.toSet hs1) (DBH.toSet hs2)
+        then return DBR.DBRelation{DBR.headers= DBH.fromSet $ Set.union (DBH.toSet hs1) (DBH.toSet hs2), DBR.tuples=cartesianProd ts1 ts2}
         else fail "Cannot perform product because of shared headers"
-    where cartesianProd tls1 tls2 = relBodyFromSet $ Set.fromList [dbtupleFromSet (dbtupleToSet i `Set.union` dbtupleToSet j) | i <- Set.toList $ relBodyToSet tls1, j <- Set.toList $ relBodyToSet tls2]
+    where cartesianProd tls1 tls2 = DBB.fromSet $ Set.fromList [DBT.fromSet (DBT.toSet i `Set.union` DBT.toSet j) | i <- Set.toList $ DBB.toSet tls1, j <- Set.toList $ DBB.toSet tls2]
 
-union :: Relation -> Relation -> Evaluator Relation
-union (Relation hs1 ts1) (Relation hs2 ts2) =
+union :: DBR.DBRelation -> DBR.DBRelation -> DBR.DBEvaluator DBR.DBRelation
+union (DBR.DBRelation hs1 ts1) (DBR.DBRelation hs2 ts2) =
     if hs1 == hs2
-        then return Relation{headers=hs1, tuples= relBodyFromSet (relBodyToSet ts1 `Set.union` relBodyToSet ts2)}
+        then return DBR.DBRelation{DBR.headers=hs1, DBR.tuples= DBB.fromSet (DBB.toSet ts1 `Set.union` DBB.toSet ts2)}
         else fail "Cannot perfrom union on relations with mismatching headers"
 
-intersection :: Relation -> Relation -> Evaluator Relation
-intersection (Relation hs1 ts1) (Relation hs2 ts2) =
+intersection :: DBR.DBRelation -> DBR.DBRelation -> DBR.DBEvaluator DBR.DBRelation
+intersection (DBR.DBRelation hs1 ts1) (DBR.DBRelation hs2 ts2) =
     if hs1 == hs2
-        then return Relation{headers=hs1, tuples= relBodyFromSet (Set.intersection (relBodyToSet ts1) (relBodyToSet ts2))}
+        then return DBR.DBRelation{DBR.headers=hs1, DBR.tuples= DBB.fromSet (Set.intersection (DBB.toSet ts1) (DBB.toSet ts2))}
         else fail "Cannot perfrom intersection on relations with mismatching headers"
 
-difference :: Relation -> Relation -> Evaluator Relation
-difference (Relation hs1 ts1) (Relation hs2 ts2) =
+difference :: DBR.DBRelation -> DBR.DBRelation -> DBR.DBEvaluator DBR.DBRelation
+difference (DBR.DBRelation hs1 ts1) (DBR.DBRelation hs2 ts2) =
     if hs1 == hs2
-        then return Relation{headers=hs1, tuples= relBodyFromSet (Set.difference (relBodyToSet ts1) (relBodyToSet ts2))}
+        then return DBR.DBRelation{DBR.headers=hs1, DBR.tuples= DBB.fromSet (Set.difference (DBB.toSet ts1) (DBB.toSet ts2))}
         else fail "Cannot perfrom difference on relations with mismatching headers"
 
-
+join :: DBR.DBRelation -> DBR.DBRelation -> DBR.DBEvaluator DBR.DBRelation
+join = undefined
 
 data RelationalExp
-  = RelationDecl Relation
+  = RelationDecl DBR.DBRelation
   | Projection DBHeaders RelationalExp
-  | Restriction Predicate RelationalExp
+  | Restriction DBPredicate RelationalExp
+  | Product RelationalExp RelationalExp
   | Union RelationalExp RelationalExp
   | Intersection RelationalExp RelationalExp
   | Difference RelationalExp RelationalExp
   | Join RelationalExp RelationalExp
 
 
-type RelValue = Evaluator Relation
+type RelValue = DBR.DBEvaluator DBR.DBRelation
 
 eval :: Expr -> RelValue
 eval e = ev (unExpr e) where
   ev (RelationDecl rel)           = return rel
   ev (Projection hs rel_e)        = project hs =<< ev rel_e
   ev (Restriction p rel_e)        = restrict p =<< ev rel_e
+  ev (Product rel_e1 rel_e2)        = do
+                                    first  <- ev rel_e1
+                                    second <- ev rel_e2
+                                    Relational.product first second
   ev (Union rel_e1 rel_e2)        = do
                                     first  <- ev rel_e1
                                     second <- ev rel_e2
-                                    union first second
+                                    Relational.union first second
   ev (Intersection rel_e1 rel_e2) = do
                                     first  <- ev rel_e1
                                     second <- ev rel_e2
-                                    union first second
+                                    Relational.intersection first second
   ev (Difference rel_e1 rel_e2)   = do
                                     first  <- ev rel_e1
                                     second <- ev rel_e2
-                                    union first second
-  -- ev (Join rel_e1 rel_e2)      = join (ev rel_e1) (ev rel_e2)
+                                    Relational.difference first second
+  ev (Join rel_e1 rel_e2)         = do
+                                    first  <- ev rel_e1
+                                    second <- ev rel_e2
+                                    Relational.join first second
 
 newtype Expr = Expr { unExpr :: forall a . RelationalExp }
