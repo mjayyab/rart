@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
 
 module DBRelation(DBRelation(..), DBEvaluator) where
 
@@ -9,7 +9,7 @@ import DBHeaders(DBHeaders)
 import DBRelBody(DBRelBody)
 
 
-newtype DBEvaluator a = DBEvaluatorImpl (Either String a) deriving (Show)
+newtype DBEvaluator a = DBEvaluatorImpl (Either String a) deriving (Show, Applicative, Functor)
 instance Monad DBEvaluator where
     (DBEvaluatorImpl ev) >>= k =
         case ev of

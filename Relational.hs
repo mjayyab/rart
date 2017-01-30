@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
-module Relational(RelValue, Expr, eval) where
+module Relational(RelValue, eval) where
 
 import Data.Set as Set
 
@@ -105,8 +105,8 @@ data RelationalExp
 
 type RelValue = DBR.DBEvaluator DBR.DBRelation
 
-eval :: Expr -> RelValue
-eval e = ev (unExpr e) where
+eval :: RelationalExp -> RelValue
+eval e = ev e where
   ev (RelationDecl rel)           = return rel
   ev (Projection hs rel_e)        = project hs =<< ev rel_e
   ev (Restriction p rel_e)        = restrict p =<< ev rel_e
@@ -131,4 +131,4 @@ eval e = ev (unExpr e) where
                                     second <- ev rel_e2
                                     Relational.join first second
 
-newtype Expr = Expr { unExpr :: forall a . RelationalExp }
+
